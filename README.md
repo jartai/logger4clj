@@ -1,11 +1,11 @@
 ##Logger4clj 0.1
-###Pure Clojure Logging API
+###Clojure Logging API
 
-This is a first attempt at a high-quality and versatile logging API written entirely in clojure.core and JDK1.6. 
+This is a first attempt at a high-quality and versatile logging API written entirely in clojure.core and JDK6. 
 
 ###Features
 
-*  Pure Clojure (requires only clojure.core and JDK1.6)
+*  Mostly-pure Clojure and a single source file (requires only clojure.core and JDK6)
 *  Loggers may be 'chained/bound together' (see second example below)
 *  Log messages are passed to a blocking queue, where separate thread(s) 
    will handle expensive I/O operations
@@ -62,6 +62,8 @@ then binds the API's logger (some-api-logger) to itself, using one of its
 registered appenders to capture some-api-logger's messages. Following that, it
 calls 'with-appenders' to use both appenders for itself as well.
 
+#####file one
+
     (ns com.some-company.some-api
       (:use
         [logger4clj.logger]))
@@ -70,6 +72,7 @@ calls 'with-appenders' to use both appenders for itself as well.
     
     ;; do stuff
     
+#####file two
     
     (ns com.another-company.some-program
       (:use
@@ -92,3 +95,5 @@ calls 'with-appenders' to use both appenders for itself as well.
         
     ;; do stuff
         
+Note that it's possible to chain an arbitary number of loggers together; lower-level loggers may even define their 
+own appenders and start themselves before being bound a client.
