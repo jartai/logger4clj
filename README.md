@@ -1,7 +1,7 @@
 ##Logger4clj 0.1
 ###Pure Clojure Logging API
 
-Clojure needs its own logging solution 
+This is a first attempt at a high-quality and versatile logging API written entirely in clojure.core and JDK1.6. 
 
 ###Features
 
