@@ -7,7 +7,7 @@ This is a first attempt at a high-quality and versatile logging API written enti
 
 *  Pure Clojure (requires only clojure.core and JDK1.6)
 *  Loggers may be 'chained/bound together' (see second example below)
-*  Log messages are passed to a blocking queue, where a separate thread
+*  Log messages are passed to a blocking queue, where separate thread(s) 
    will handle expensive I/O operations
 *  No external 'properties' configurations; clojure code externalizes nicely 
    by itself!
