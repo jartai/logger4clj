@@ -27,12 +27,12 @@ This is a first attempt at a high-quality and versatile logging API written enti
 
 ###Examples
 
+__Basic Example:__
+
 In the first example, a logger is created with a file-appender and used to write
 various log messages to a file. An appender is 'registered' and then the 
 'with-appender' tells the logger to use that appender. You'll see why these are
 separate statements later.
-
-__Basic Example:__
 
     (ns mypackage.myfile
       (:use 
@@ -51,7 +51,9 @@ __Basic Example:__
       
       (catch Exception e
         (logger :error "An error occurred!" e)))
-        
+       
+__More Complicated Example:__        
+
 The following demonstrates a logger being defined in some third-party API and
 then being 'bound' to a logger defined by the client program.
 
@@ -59,9 +61,7 @@ Note that the def-logger in the second namespace registers two appenders and
 then binds the API's logger (some-api-logger) to itself, using one of its
 registered appenders to capture some-api-logger's messages. Following that, it
 calls 'with-appenders' to use both appenders for itself as well.
-   
-__More Complicated Example:__        
-        
+
     (ns com.some-company.some-api
       (:use
         [logger4clj.logger]))
