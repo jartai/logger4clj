@@ -1,8 +1,16 @@
 (ns logger4clj.logger
-  (:import [java.io File BufferedWriter FileWriter PrintWriter]
-           [java.text SimpleDateFormat]
-           [java.util.concurrent LinkedBlockingQueue]
-           [java.util Date]))
+  "
+File:     logger4clj/logger.clj
+Website:  http://github.com/jkauzlar/logger4clj
+Author:   Joe Kauzlarich
+
+Description: 
+  Logger4clj is a hierarchical logger for the clojure language. See the 
+  website listed above or README.md in this project for more information.
+"
+  (:import [java.util.concurrent LinkedBlockingQueue]))
+
+(def CURRENT_VERSION "0.1.1")
 
 (def valid-log-levels 
   {:debug '("DEBUG" 0) 
@@ -10,9 +18,9 @@
    :warning '("WARNING" 2) 
    :error '("ERROR" 3) 
    :fatal '("FATAL" 4) 
-   :none '("no-logging-at-this-level", 5)})
+   :none '("no-logging-at-this-level", -1)})
 
-(def logging-thread-group (ThreadGroup. "logging-threadgroup"))
+(def logging-thread-group (ThreadGroup. "logger4clj-threadgroup"))
 
 (defmacro def-logger
   "Constructs two vars in the namespace in which this is called: one is a 
@@ -33,8 +41,7 @@ expansion of the arguments until log-lvl has been tested.
     `(do
        (def ~(symbol logger-var-name) (-> {:name ~logger-name
                                            
-                                           ;; Queue for this node and mutable tree
-                                           ;;   of bound logger queues
+                                           ;; Queue for this node 
                                            :queue  (LinkedBlockingQueue.)
                                            
                                            ;; map of appender-ids -> [appender-def log-lvl] 
@@ -64,6 +71,8 @@ expansion of the arguments until log-lvl has been tested.
                (.offer q# full-msg#))))))))
 
 (defn- get-logger-var 
+  "Takes either the logger function or logger data and returns the logger data. This
+allows some flexibility in function arguments as to which is provided."
   [logger-or-data]
   (if (map? logger-or-data)
     logger-or-data
@@ -113,11 +122,17 @@ appender to each"
     (push-appender l appender-id appender log-lvl)))
 
 (defn bind-logger
-  "Binds a logger to another logger. Use :with-appender [appender-id log-lvl] 
+  "Binds a logger to another logger. Optionally use :with-appender [appender-id log-lvl] 
 (with the appender-id defined in the register-appender clauses) to attach an
 appender to messages coming from the bound logger. At (at least) the top of a 
-chain of bound loggers, a :with-appender clause must be used so that the messages 
-are logged somewhere."
+chain of bound loggers, a :with-appender clause must be used when messages must be 
+logged somewhere.
+
+If no appender is specified, then this binding will only be used when this logger
+is bound by another logger.
+
+Note: this implementation currently does not check for cycles in binding chains; a stack
+      overflow would be the likely outcome."
   [logger target-logger & opts]
   (let [logger-var (get-logger-var logger)
         target-logger-var (get-logger-var target-logger)
@@ -132,8 +147,9 @@ are logged somewhere."
   logger)
 
 (defn with-appenders
-  "Takes the logger and one or more vectors [appender-id log-lvl]. Appender-id
-must be defined beforehand using register-appender."
+  "Assigns registered appenders to this logger. Takes the logger and one or more 
+vectors [appender-id log-lvl]. Appender-id must be defined beforehand using 
+register-appender."
   [logger & appender-specs]
   (let [logger-var (get-logger-var logger)]
     (swap! (:appenders logger-var) 
@@ -162,6 +178,10 @@ must be defined beforehand using register-appender."
     (= (deref (:logger-state logger-var)) 
        :running)))
 
+(defn- set-logger-state
+  [logger-var state]
+  (swap! (:logger-state logger-var) (fn [x] state)))
+
 (defn- get-lvl-idx
   "Returns a numeric value for the logging level, so that it may be compared
 against listener thresholds."
@@ -187,20 +207,30 @@ against listener thresholds."
           ((:do-log (first appender-def)) time-ms log-lvl category msg exception))))))
 
 (defn- init-logging-thread
-  "Initializes the queue reader thread for the logger. "
+  "Initializes and starts the queue reader thread for the logger. "
   [logger]
   (let [queue (:queue logger)]
-    (Thread. logging-thread-group
-           (fn []
-             (loop []
-               (when (is-running? logger)
-                 (handle-log-message logger (.take queue))
-                 (recur)))))))
+    (.start (Thread. logging-thread-group
+                     (fn []
+                       (loop []
+                         (when (is-running? logger)
+                           (handle-log-message logger (.take queue))
+                           (recur))))))))
 
 (defn- doto-all-appenders
   [logger op]
   (doseq [appender-def (vals (deref (:appenders logger)))]
     ((get (first appender-def) op))))
+
+(defn- doto-all-bound-loggers
+  [logger-var op]
+  (doseq [bound-logger (vals (deref (:bound-loggers logger-var)))]
+    (op bound-logger)))
+
+(defn- send-stop-message
+  "This will unblock the queue, but not send anything, so the thread exits"
+  [logger-var]
+  (.offer (:queue logger-var) [-1 :none :-stop-logger "" nil]))
 
 (defn start-logger
   "Starts this logger and all bound loggers. Recursively creates a thread for 
@@ -208,11 +238,11 @@ each bound logger, loggers bound to boung-loggers, etc."
   [logger]
   (let [logger-var (get-logger-var logger)]
     (if-not (is-running? logger-var)
-      (do 
-        (doto-all-appenders logger-var :init)
-        (swap! (:logger-state logger-var) (fn [x] :running))
-        (.start (init-logging-thread logger-var))
-        (doall (map start-logger (vals (deref (:bound-loggers logger-var))))))
+      (doto logger-var 
+        (doto-all-appenders :init)
+        (set-logger-state :running)
+        (init-logging-thread)
+        (doto-all-bound-loggers start-logger))
       (throw (IllegalStateException. 
                (format "Logger [%s] is already running when trying to start!" 
                        (:name logger-var))))))
@@ -224,91 +254,28 @@ already stopped."
   [logger]
   (let [logger-var (get-logger-var logger)] 
     (when (is-running? logger-var)
-      (doto-all-appenders logger-var :init)
-      ;; send stop message to unblock the queue so the thread exits
-      (.offer (:queue logger-var) [-1 :none :-stop-logger "" nil])
-      (swap! (:logger-state logger-var) (fn [x] :stopped))
-      (doall (map stop-logger (vals (deref (:bound-loggers logger-var)))))))
+      (doto logger-var 
+        (doto-all-appenders :clean-up)
+        (set-logger-state :stopped)
+        (send-stop-message)
+        (doto-all-bound-loggers stop-logger))))
   logger)
 
-;; ############# Appenders #################====================================
-
-(defn- get-file-and-validate
-  [filename-or-file]
-  (let [file (if (instance? File filename-or-file) 
-               filename-or-file 
-               (if (instance? String filename-or-file) 
-                 (File. filename-or-file)
-                 (throw (IllegalArgumentException. 
-                          "create-file-listener accepts either a File or String!"))))
-        parent (.getParentFile file)]
-    (if (and (.exists parent) (.isDirectory parent) (.canWrite parent))
-      file
-      (throw (IllegalArgumentException. 
-               (format "Log file [%s] has invalid parent folder [%s]. It may not exist or may not be writable!"
-                       file parent))))))
-
 (defn create-appender
+  "Define a custom appender. This accepts three functions, to be defined as follows:
+   * init:   () -> ()
+   * do-log: (timestamp:long, log-lvl:keyword, category:String, msg:String, exception:java.lang.Throwable) -> ()
+   * clean-up: () -> ()"
   [init do-log clean-up]
-  {:init init
-   :do-log do-log ;; function should accept timestamp, log-lvl, category, msg, exception
-   :clean-up clean-up})
-
-(defn- create-print-writer
-  [filename-or-file]
-  (PrintWriter. (BufferedWriter. (FileWriter. (get-file-and-validate filename-or-file) true)) true))
-
-(defn create-file-appender
-  "Create file listener that writes to the given file at the given log-level. The file stream
-will remain open until the logger is closed with :close."
-  [filename-or-file & 
-   {date-fmt-str :date-format :or 
-    {date-fmt-str "yyyy-MM-dd HH:mm:ss.SSSZ"}}]
-  (let [io-agent (agent nil)
-        date-fmt (SimpleDateFormat. date-fmt-str)]
-    (create-appender
-      ;; does not exit until stream is created
-      (fn [] (when-let [pw  (create-print-writer filename-or-file)] 
-               (await (send io-agent (fn [x] pw)))))
-      (fn [timestamp log-lvl category msg exception]
-        (send io-agent 
-              (fn [out]
-                (when out
-                  (.println out
-                    (format "[%s]{%s}[%s] %s" 
-                            (.format date-fmt timestamp)
-                            category
-                            (first (get valid-log-levels log-lvl))
-                            msg))
-                  (when-not (nil? exception)
-                    (.printStackTrace exception out))
-                  ;; don't return anything
-                  out))))
-      ;; does not exit function until stream is closed
-      (fn [] (await (send io-agent (fn [out]
-                                     (when out 
-                                       (.flush out)
-                                       (.close out)
-                                       nil))))))))
-
-(defn create-console-appender
-  "Creates a console listener that writes to stdout at the given log level"
-  [ & 
-   {date-fmt-str :date-format :or 
-    {date-fmt-str "yyyy-MM-dd HH:mm:ss.SSSZ"}}]
-  (let [date-fmt (SimpleDateFormat. date-fmt-str)]
-    (create-appender
-      (fn [])
-      (fn [timestamp log-level category msg exception]
-                         (do
-                           (println 
-                             (format "[%s]{%s}[%s] %s" 
-                                     (.format date-fmt timestamp)
-                                     category
-                                     (first (get valid-log-levels log-level))
-                                     msg))
-                           (if (not (nil? exception))
-                             (.printStackTrace exception))))
-      (fn []))))
-
+  (do
+    (assert (fn? init) 
+            (str "init parameter must be a function, but instead is a " (type init) "!"))
+    (assert (fn? do-log) 
+            (str "do-log parameter must be a function, but instead is a " (type do-log) "!"))
+    (assert (fn? clean-up) 
+            (str "clean-up parameter must be a function, but instead is a " (type clean-up) "!"))
+    {:map-type ::logger4clj-appender
+     :init init
+     :do-log do-log
+     :clean-up clean-up}))
 
