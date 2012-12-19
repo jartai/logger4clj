@@ -3,26 +3,38 @@
 
 This is a first attempt at a high-quality and versatile logging API written entirely in clojure.core and JDK6. 
 
-###Features
+###Features 0.1
 
 *  Mostly-pure Clojure and a single source file (requires only clojure.core and JDK6)
 *  Loggers may be 'chained/bound together' (see second example below)
-*  Log messages are passed to a blocking queue, where separate thread(s) 
-   will handle expensive I/O operations
-*  No external 'properties' configurations; clojure code externalizes nicely 
-   by itself!
-*  Different log levels (:debug, :info, :warning, :error, :fatal)
-*  Comes with two appenders at the moment (file and console), but custom 
-   appenders are easy to 'plug in'
-   
+*  Log messages are passed to a blocking queue, where separate thread(s) will 
+   handle expensive I/O operations
+*  No external 'properties' configurations; clojure code externalizes nicely by itself!
+*  Different log levels (:trace :debug, :info, :warning, :error, :fatal)
+*  Comes with two appenders (file and console), but custom appenders are easy 
+   to 'plug in'
+
+###Features 0.2 (not yet released)
+
+*  File appender supports time- or size-based rollover
+*  File appender can clean up old logs
+*  File and console appenders accept numerous 'formatter' options: xml, yaml, 
+   json, clojure or formatted string text
+*  file name and line number of log statement now log-able
+
+
 ###Wish List
 
 *  Expanded documentation
-*  More versatile appenders, and more of them
-*  Configurable formatters for appended data
-*  It may be yet be possible, but very tricky, to only get the logging message
-   parameter to evaluate if the logging level is high enough to warrant it. Currently
-   this would require the courage to attempt writing a macro that produces a macro. 
+*  printf-style logging messages e.g. (log :error "Invalid parameter [%s]!" 
+   parm) => "Invalid parameter [value of parm]!"
+*  clojure/java.jdbc-based database logging appender
+*  ability to log current thread and namespace
+*  Message bundles for externalizing messages e.g. (log :error :invalid-parm-error parm)
+*  It may be yet be possible, but very tricky, to only get the logging message 
+   parameter to evaluate if the logging level is high enough to warrant it. 
+   Currently this would require the courage to attempt writing a macro that produces a macro.
+
 
 
 ###Examples
@@ -34,6 +46,7 @@ various log messages to a file. An appender is 'registered' and then the
 'with-appender' tells the logger to use that appender. You'll see why these are
 separate statements later.
 
+````clojure
     (ns mypackage.myfile
       (:use 
         [logger4clj.logger]))
@@ -42,7 +55,8 @@ separate statements later.
       (register-appender :file-appender
         (create-file-appender "/home/johnd/logs/mylog.log"))
       (with-appenders
-        [:file-appender :error]))
+        [:file-appender :error])
+      (start-logger))
         
     (try
       (logger :info "Program is starting...")
@@ -51,7 +65,7 @@ separate statements later.
       
       (catch Exception e
         (logger :error "An error occurred!" e)))
-       
+````
 __More Complicated Example:__        
 
 The following demonstrates a logger being defined in some third-party API and
@@ -63,7 +77,7 @@ registered appenders to capture some-api-logger's messages. Following that, it
 calls 'with-appenders' to use both appenders for itself as well.
 
 #####file one
-
+````clojure
     (ns com.some-company.some-api
       (:use
         [logger4clj.logger]))
@@ -71,9 +85,9 @@ calls 'with-appenders' to use both appenders for itself as well.
     (def-logger some-api-logger)
     
     ;; do stuff
-    
+````    
 #####file two
-    
+````clojure
     (ns com.another-company.some-program
       (:use
         [logger4clj.logger])
@@ -91,9 +105,10 @@ calls 'with-appenders' to use both appenders for itself as well.
         :with-appender [:log-file :error])
       (with-appenders
         [:log-file :info]
-        [:console :debug]))
+        [:console :debug])
+      (start-logger))
         
     ;; do stuff
-        
+````        
 Note that it's possible to chain an arbitary number of loggers together; lower-level loggers may even define their 
 own appenders and start themselves before being bound a client.
