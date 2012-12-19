@@ -10,14 +10,15 @@ Description:
 "
   (:import [java.util.concurrent LinkedBlockingQueue]))
 
-(def CURRENT_VERSION "0.1.1")
+(def CURRENT_VERSION "0.2")
 
 (def valid-log-levels 
-  {:debug '("DEBUG" 0) 
-   :info '("INFO" 1) 
-   :warning '("WARNING" 2) 
-   :error '("ERROR" 3) 
-   :fatal '("FATAL" 4) 
+  {:trace '("TRACE" 0)
+   :debug '("DEBUG" 1) 
+   :info '("INFO" 2) 
+   :warning '("WARNING" 3) 
+   :error '("ERROR" 4) 
+   :fatal '("FATAL" 5) 
    :none '("no-logging-at-this-level", -1)})
 
 (def logging-thread-group (ThreadGroup. "logger4clj-threadgroup"))
@@ -67,7 +68,20 @@ expansion of the arguments until log-lvl has been tested.
            (~logger-var log-lvl# msg# nil))
          ([log-lvl# msg# exc#]
            (when-let [q# (:queue ~(symbol logger-var-name))]
-             (let [full-msg# [(System/currentTimeMillis) log-lvl# ~logger-name msg# exc#]]
+             (let [stacktrace# (apply vector 
+                                      (seq (.getStackTrace 
+                                             (Thread/currentThread))))
+                   ;; if 2-arg method was called, then item is at 4th level, otherwise 3rd
+                   stacktrace-item# (if (= (get stacktrace# 1) (get stacktrace# 2))
+                                      (get stacktrace# 3)
+                                      (get stacktrace# 2))
+                   full-msg# {:time-ms (System/currentTimeMillis)
+                              :log-lvl log-lvl#
+                              :category ~logger-name
+                              :msg msg#
+                              :exception exc#
+                              :file-name (.getFileName stacktrace-item#)
+                              :line-number (.getLineNumber stacktrace-item#)}]
                (.offer q# full-msg#))))))))
 
 (defn- get-logger-var 
@@ -193,18 +207,18 @@ against listener thresholds."
 (defn- check-log-lvl
   "Returns true if the listener's lvl permits the msg based on the msg-lvl"
   [listener-lvl msg-lvl]
-  (let [listener-n (get-lvl-idx listener-lvl)
-        msg-n (get-lvl-idx msg-lvl)]
-    (<= listener-n msg-n)))
+  (let [listener-idx (get-lvl-idx listener-lvl)
+        msg-idx (get-lvl-idx msg-lvl)]
+    (<= listener-idx msg-idx)))
 
 (defn- handle-log-message
   "Passes the log message information to any listener that will accept it"
-  [logger [time-ms log-lvl category msg exception]]
-  (when-not (= category :-stop-logger)
-    (let [appenders (deref (:appenders logger))]
-      (doseq [appender-def (vals appenders)] 
-        (when (check-log-lvl (second appender-def) log-lvl)
-          ((:do-log (first appender-def)) time-ms log-lvl category msg exception))))))
+  [logger msg-parms]
+  (when-not (= (:category msg-parms) :-stop-logger)
+    (doseq [appender-def (vals (deref (:appenders logger)))] 
+      (when (check-log-lvl (second appender-def) (:log-lvl msg-parms))
+        (println "Message parameters: " msg-parms)
+        ((:do-log (first appender-def)) msg-parms)))))
 
 (defn- init-logging-thread
   "Initializes and starts the queue reader thread for the logger. "
@@ -250,7 +264,10 @@ each bound logger, loggers bound to boung-loggers, etc."
 
 (defn stop-logger
   "Stops this logger and all bound loggers. Doesn't complain if the logger is
-already stopped."
+already stopped. 
+
+NOTE: Currently, messages may still be logged to a stopped logger; if
+the logger is started again, these messages will be delivered."
   [logger]
   (let [logger-var (get-logger-var logger)] 
     (when (is-running? logger-var)
@@ -264,8 +281,18 @@ already stopped."
 (defn create-appender
   "Define a custom appender. This accepts three functions, to be defined as follows:
    * init:   () -> ()
-   * do-log: (timestamp:long, log-lvl:keyword, category:String, msg:String, exception:java.lang.Throwable) -> ()
-   * clean-up: () -> ()"
+   * do-log: (msg-parms) -> ()
+   * clean-up: () -> ()
+
+The msg-parms is a map containing the following keys:
+   :time-ms
+   :log-lvl 
+   :category 
+   :msg
+   :exception
+   :file-name
+   :line-number
+"
   [init do-log clean-up]
   (do
     (assert (fn? init) 

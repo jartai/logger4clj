@@ -2,18 +2,21 @@
   "Appender and formatter definitions"
   (:use [logger4clj.logger]
         [logger4clj.formatters])
-  (:import [java.io File BufferedWriter FileWriter PrintWriter]
+  (:import [java.io File BufferedWriter FileWriter PrintWriter FilenameFilter]
            [java.util Date]
            [java.text SimpleDateFormat]))
 
+(defn- get-file
+  [filename-or-file]
+  (condp instance? filename-or-file
+    File filename-or-file
+    String (File. filename-or-file)
+    (throw (IllegalArgumentException. 
+             "This method accepts either a java.util.File or a string!"))))
+
 (defn- get-file-and-validate
   [filename-or-file]
-  (let [file (if (instance? File filename-or-file) 
-               filename-or-file 
-               (if (instance? String filename-or-file) 
-                 (File. filename-or-file)
-                 (throw (IllegalArgumentException. 
-                          "create-file-listener accepts either a java.util.File or a string!"))))
+  (let [file (get-file filename-or-file)
         parent (.getParentFile file)]
     (if (and (.exists parent) (.isDirectory parent) (.canWrite parent))
       file
@@ -24,10 +27,6 @@
 (defn- create-print-writer
   [file]
   (PrintWriter. (BufferedWriter. (FileWriter. file true)) true))
-
-(defn- get-rollover-type
-  "return either :size or :time"
-  [rollover-every])
 
 (def size-units {:byte 1 :bytes 1 
                  :kbyte 1024 :kbytes 1024
@@ -80,7 +79,7 @@
 
 (defn- rollover-check
   "Performs rollover if necessary and returns nil or the new file to which to
-write log messages (because old file was renamed during rollover."
+write log messages (because old file was renamed during rollover)."
   [log-file rollover-every previous-timestamp]
   (let [current-timestamp (System/currentTimeMillis)]
     (if (is-time-rollover? rollover-every)
@@ -90,9 +89,32 @@ write log messages (because old file was renamed during rollover."
                  (should-rollover-by-size? rollover-every log-file))
         (do-rollover log-file current-timestamp)))))
 
+(defn- is-rollover-file?
+  [log-file-base other-file ext-length]
+  (let [other-path (.getAbsolutePath other-file)] 
+    (and (.startsWith other-path log-file-base)
+         (= ext-length (- (.length other-path) (.length log-file-base))))))
+
+(defn- get-clean-up-candidates
+  [dir log-file ext-length]
+  (let [files (seq (.listFiles dir))
+        log-file-base (str (.getAbsolutePath log-file) ".")]
+    (loop [all-files files files-to-keep '()]
+      (if (empty? all-files)
+        files-to-keep
+        (let [this-file (.getAbsoluteFile (first all-files))]
+          (recur (rest all-files) 
+                 (if (is-rollover-file? log-file-base this-file ext-length)
+                   (cons this-file files-to-keep)
+                   files-to-keep)))))))
+
 (defn- clean-up-old-logs
-  [log-file max-logs]
-  )
+  [filename-or-file max-logs ext-length]
+  (let [file (get-file filename-or-file)
+        parent (.getParentFile file)
+        files-to-clean (sort (get-clean-up-candidates parent (.getAbsoluteFile file) ext-length))]
+    (doseq [f (drop max-logs files-to-clean)]
+      (.delete f))))
 
 (defn create-file-appender
   "Create file listener that writes to the given file at the given log-level. 
@@ -152,8 +174,8 @@ Cleaning Up Old Log Files (:max-logs)
 -------------------------------------
 
 By use the :max-logs option, you can specify the number of log files to keep. This 
-calculation will be performed after each roll-over and the oldest files will be
-deleted from disk. E.g.:
+calculation will be performed after each roll-over and the oldest files (by 
+timestamp suffix) will be deleted from disk. E.g.:
 
 (create-file-appender \"logs/program.log\"
         :rollover-every [10 :mbytes]
@@ -174,19 +196,21 @@ When this option is not specified, log files will accumulate indefinitely.
         file (get-file-and-validate filename-or-file)]
     (create-appender
       ;; does not exit until stream is created
-      (fn [] (let [pw  (create-print-writer file)] 
+      (fn [] (let [pw  (create-print-writer file)]
                (await (send io-agent (fn [x] pw)))))
-      (fn [timestamp log-lvl category msg exception]
+      (fn [msg-parms]
         (when rollover-every
           (when-let [new-file (rollover-check file rollover-every)]
             (let [pw (create-print-writer new-file)]
               (await (send io-agent (fn [x] pw))))
             (when (> max-logs 0) 
-              (clean-up-old-logs new-file max-logs))))
+              (clean-up-old-logs new-file max-logs 13))))
         (await (send io-agent 
                      (fn [out]
                        (when out
-                         (.print out (formatter timestamp log-lvl category msg exception)))
+                         (doto out
+                           (.print (formatter msg-parms))
+                           (.flush)))
                        out)))
         ()) 
       ;; does not exit function until stream is closed
@@ -206,7 +230,7 @@ An optional :formatter parameter accepts a formatter as its value, e.g.
                     \"[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} ${ex}${n}\"))
 
 This example shows the default formatter. See specific formatter documentation 
-for more information on how to configure a formatter.  
+for more information on how to create and configure a formatter.  
 "
   [ & 
    {formatter :formatter :or 
@@ -214,8 +238,8 @@ for more information on how to configure a formatter.
                  "[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} ${ex}${n}")}}]
   (create-appender
     (fn [])
-    (fn [timestamp log-level category msg exception]
-      (print (formatter timestamp log-level category msg exception)))
+    (fn [msg-parms]
+      (print (formatter msg-parms))
+      (.flush *out*))
     (fn [])))
-
 

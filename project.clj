@@ -4,7 +4,11 @@
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"
             :distribution :repo}
+  :min-lein-version "2.0.0"
   :dependencies [[org.clojure/clojure "1.4.0"]]
+  :source-paths ["src"]
+  :test-paths ["test"]
+  :target-path "target/"
   :plugins [[lein2-eclipse "2.0.0"]]
-  :profiles {:dev {:dependencies [[midje "1.4.0"]]
-                   :plugins [[lein-midje "2.0.1"]]}})
+  :profiles {:dev {:dependencies [[midje "1.4.0"]]}}  
+  :codox {:output-dir "doc/codox"})
