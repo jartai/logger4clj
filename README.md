@@ -12,15 +12,17 @@ This is a first attempt at a high-quality and versatile logging API written enti
 *  No external 'properties' configurations; clojure code externalizes nicely by itself!
 *  Different log levels (:trace :debug, :info, :warning, :error, :fatal)
 *  Comes with two appenders (file and console), but custom appenders are easy 
-   to 'plug in'
+   to create
 
 ###Features 0.2 (not yet released)
 
 *  File appender supports time- or size-based rollover
 *  File appender can clean up old logs
-*  File and console appenders accept numerous 'formatter' options: xml, yaml, 
+*  File and console appenders accept numerous 'formatters': xml, yaml, 
    json, clojure or formatted string text
 *  file name and line number of log statement now log-able
+*  category is now the namespace in which the logger was defined, instead of
+   the logger name
 
 
 ###Wish List
@@ -49,11 +51,13 @@ separate statements later.
 ````clojure
     (ns mypackage.myfile
       (:use 
-        [logger4clj.logger]))
+        [logger4clj.logger])
+      (:require
+        [logger4clj.appenders :as apps]))
         
     (def-logger logger
       (register-appender :file-appender
-        (create-file-appender "/home/johnd/logs/mylog.log"))
+        (apps/create-file-appender "/home/johnd/logs/mylog.log"))
       (with-appenders
         [:file-appender :error])
       (start-logger))
@@ -81,10 +85,19 @@ calls 'with-appenders' to use both appenders for itself as well.
     (ns com.some-company.some-api
       (:use
         [logger4clj.logger]))
-        
+    
+    ;; just create a plain logger with no appenders, without starting it    
     (def-logger some-api-logger)
     
-    ;; do stuff
+    ;; use it
+    (defn my-func 
+        [x y]
+        (try
+          (/ x (- y 1))
+          (catch ArithmeticException e
+              (some-api-logger :error "The value of y cannot be 1" e))))
+    
+    ;; do other stuff
 ````    
 #####file two
 ````clojure
@@ -92,23 +105,44 @@ calls 'with-appenders' to use both appenders for itself as well.
       (:use
         [logger4clj.logger])
       (:require 
-        [com.some-company.some-api :as some-api))
+        [com.some-company.some-api :as some-api]
+        [logger4clj.appenders :as apps]
+        [logger4clj.formatters :as frms]))
         
-    (def-logger logger
+    (def-logger my-logger
       (register-appender :console
-        (create-console-appender))
+        (apps/create-console-appender
+          ;; add a formatter instead of using default
+          :formatter (frms/create-line-formatter 
+                        "${ts:HH:mm:ss.SSSZ} -  (${fn}:${ln}) ${msg}${n}"))
+                        
       (register-appender :log-file
-        (create-file-appender 
-          "/var/log/some-program/output.log" 
-          :date-format "yyyy/MM/dd HH:mm:ss"))
+        (apps/create-file-appender 
+          "/var/log/some-program/output.log"
+          ;; format log msgs as XML
+          :formatter (frms/create-xml-formatter)))
+      
+      ;; use the :log-file appender to write messages from some-api-logger
+      ;;   and set the log level to :error for some-api-logger 
       (bind-logger some-api/some-api-logger
         :with-appender [:log-file :error])
+        
+      ;; for my-logger, append to both console and the log file
       (with-appenders
         [:log-file :info]
         [:console :debug])
-      (start-logger))
         
-    ;; do stuff
+      ;; don't forget to start the logger - this will start the queue reading
+      ;;    threads. You can also stop it if you want, but that's not necessary
+      (start-logger))
+       
+    ;; use the logger 
+    (my-logger :info "Logger has been initialized and started!")
+    
+    ;;the bound-logger (some-api-logger) is now active for logging
+    (some-api/my-func 10 1)
+    
+    ;; do other stuff
 ````        
 Note that it's possible to chain an arbitary number of loggers together; lower-level loggers may even define their 
 own appenders and start themselves before being bound a client.
