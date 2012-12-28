@@ -40,7 +40,9 @@ expansion of the arguments until log-lvl has been tested.
   (let [logger-name (str logger-var)
         logger-var-name (str logger-var "-var")]
     `(do
-       (def ~(symbol logger-var-name) (-> {:name ~logger-name
+       (def ~(symbol logger-var-name) (-> {:map-type :logger4clj-logger
+                                           
+                                           :name ~logger-name
                                            
                                            ;; Queue for this node 
                                            :queue  (LinkedBlockingQueue.)
@@ -77,7 +79,7 @@ expansion of the arguments until log-lvl has been tested.
                                       (get stacktrace# 2))
                    full-msg# {:time-ms (System/currentTimeMillis)
                               :log-lvl log-lvl#
-                              :category ~logger-name
+                              :category (str *ns*)
                               :msg msg#
                               :exception exc#
                               :file-name (.getFileName stacktrace-item#)
@@ -88,9 +90,19 @@ expansion of the arguments until log-lvl has been tested.
   "Takes either the logger function or logger data and returns the logger data. This
 allows some flexibility in function arguments as to which is provided."
   [logger-or-data]
-  (if (map? logger-or-data)
+  (if (and 
+        (map? logger-or-data)
+        (contains? logger-or-data :map-type)
+        (= (:map-type logger-or-data :logger4clj-logger)))
     logger-or-data
-    (logger-or-data :-internal)))
+    (let [internal (try 
+                     (logger-or-data :-internal)
+                     (catch Exception e 
+                       nil))]
+      (if (nil? internal)
+        (throw (IllegalArgumentException. 
+                 (format "Expected logger in argument but got a [%s]" 
+                         (class logger-or-data))))))))
 
 (defn- comma-separated
   [list-of-strings]
@@ -301,7 +313,7 @@ The msg-parms is a map containing the following keys:
             (str "do-log parameter must be a function, but instead is a " (type do-log) "!"))
     (assert (fn? clean-up) 
             (str "clean-up parameter must be a function, but instead is a " (type clean-up) "!"))
-    {:map-type ::logger4clj-appender
+    {:map-type :logger4clj-appender
      :init init
      :do-log do-log
      :clean-up clean-up}))
