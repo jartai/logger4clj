@@ -1,7 +1,22 @@
-##Logger4clj 0.1
+##Logger4clj 0.2
 ###Clojure Logging API
 
-This is a first attempt at a high-quality and versatile logging API written entirely in clojure.core and JDK6. 
+A fast and versatile logging API written entirely in clojure.core and JDK6. 
+
+Available in leiningen via clojars:
+````clojure
+  [logger4clj "0.2"]
+````
+
+###Features 0.2
+
+*  File appender supports time- or size-based rollover
+*  File appender can clean up old logs
+*  File and console appenders accept numerous 'formatters': xml, yaml, 
+   json, clojure or formatted string text
+*  file name and line number of log statement now log-able
+*  category is now the namespace in which the logger was defined, instead of
+   the logger name
 
 ###Features 0.1
 
@@ -13,17 +28,6 @@ This is a first attempt at a high-quality and versatile logging API written enti
 *  Different log levels (:trace :debug, :info, :warning, :error, :fatal)
 *  Comes with two appenders (file and console), but custom appenders are easy 
    to create
-
-###Features 0.2 (not yet released)
-
-*  File appender supports time- or size-based rollover
-*  File appender can clean up old logs
-*  File and console appenders accept numerous 'formatters': xml, yaml, 
-   json, clojure or formatted string text
-*  file name and line number of log statement now log-able
-*  category is now the namespace in which the logger was defined, instead of
-   the logger name
-
 
 ###Wish List
 
@@ -55,20 +59,23 @@ separate statements later.
       (:require
         [logger4clj.appenders :as apps]))
         
-    (def-logger logger
+    (def-logger my-logger
+      ;; create the appender
       (register-appender :file-appender
         (apps/create-file-appender "/home/johnd/logs/mylog.log"))
+        
+      ;; use the appender with my-logger
       (with-appenders
         [:file-appender :error])
       (start-logger))
         
     (try
-      (logger :info "Program is starting...")
+      (my-logger :info "Program is starting...")
       
       (println (+ 1 1))
       
       (catch Exception e
-        (logger :error "An error occurred!" e)))
+        (my-logger :error "An error occurred!" e)))
 ````
 __More Complicated Example:__        
 
