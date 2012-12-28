@@ -129,7 +129,7 @@ An optional :formatter parameter accepts a formatter as its value, e.g.
 
 (create-file-appender \"logs/program.log\" 
        :formatter (create-line-formatter
-                    \"[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} ${ex}${n}\"))
+                    \"[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} (${fn}:${ln}) ${ex}${n}\"))
 
 This example shows the default formatter. See specific formatter documentation 
 for more information on how to configure a formatter.  
@@ -189,7 +189,7 @@ When this option is not specified, log files will accumulate indefinitely.
     max-logs :max-logs
     :or 
     {formatter (create-line-formatter 
-                 "[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} ${ex}${n}")
+                 "[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} (${fn}:${ln}) ${ex}${n}")
      rollover-every nil
      max-logs -1}}]
   (let [io-agent (agent nil)
@@ -203,21 +203,21 @@ When this option is not specified, log files will accumulate indefinitely.
           (when-let [new-file (rollover-check file rollover-every)]
             (let [pw (create-print-writer new-file)]
               (await (send io-agent (fn [x] pw))))
-            (when (> max-logs 0) 
+            (when (> max-logs 0)
               (clean-up-old-logs new-file max-logs 13))))
-        (await (send io-agent 
+        (await (send io-agent
                      (fn [out]
                        (when out
                          (doto out
                            (.print (formatter msg-parms))
                            (.flush)))
                        out)))
-        ()) 
+        ())
       ;; does not exit function until stream is closed
       (fn [] (await (send io-agent (fn [out]
-                                     (when out 
+                                     (when out
                                        (.flush out)
-                                       (.close out)) 
+                                       (.close out))
                                      nil)))))))
 
 (defn create-console-appender
@@ -227,7 +227,7 @@ An optional :formatter parameter accepts a formatter as its value, e.g.
 
 (create-console-appender 
        :formatter (create-line-formatter
-                    \"[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} ${ex}${n}\"))
+                    \"[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} (${fn}:${ln}) ${ex}${n}\"))
 
 This example shows the default formatter. See specific formatter documentation 
 for more information on how to create and configure a formatter.  
@@ -235,7 +235,7 @@ for more information on how to create and configure a formatter.
   [ & 
    {formatter :formatter :or 
     {formatter (create-line-formatter 
-                 "[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} ${ex}${n}")}}]
+                 "[${ts:yyyy-MM-dd HH:mm:ss.SSSZ}][${lvl}] ${msg} (${fn}:${ln}) ${ex}${n}")}}]
   (create-appender
     (fn [])
     (fn [msg-parms]
