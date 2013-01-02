@@ -4,6 +4,7 @@
 A fast and versatile logging API written entirely in clojure.core and JDK6. 
 
 Available in leiningen via clojars:
+
 ````clojure
   [logger4clj "0.2"]
 ````
@@ -153,3 +154,13 @@ calls 'with-appenders' to use both appenders for itself as well.
 ````        
 Note that it's possible to chain an arbitary number of loggers together; lower-level loggers may even define their 
 own appenders and start themselves before being bound a client.
+
+##License
+
+Source Copyright © 2012 Joe Kauzlarich. 
+Distributed under the Eclipse Public License, the same as Clojure uses. 
+See the file COPYING.
+
+
+
+
