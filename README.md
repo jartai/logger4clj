@@ -9,6 +9,9 @@ Available in leiningen via clojars:
   [logger4clj "0.2"]
 ````
 
+Read the [Logger4clj Manual](https://github.com/jkauzlar/logger4clj/wiki/Logger4clj-Manual) 
+for an in-depth introduction.
+
 ###Features 0.2
 
 *  File appender supports time- or size-based rollover
