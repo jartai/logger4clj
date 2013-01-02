@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="lib" path="/home/joseph/workspace/logger4clj/target/classes"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/midje/midje/1.4.0/midje-1.4.0.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/utilize/utilize/0.2.3/utilize-0.2.3.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/colorize/colorize/0.1.1/colorize-0.1.1.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/org/clojure/core.incubator/0.1.0/core.incubator-0.1.0.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/org/clojure/tools.macro/0.1.1/tools.macro-0.1.1.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/org/clojure/math.combinatorics/0.0.1/math.combinatorics-0.0.1.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/org/clojure/algo.monads/0.1.0/algo.monads-0.1.0.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/org/clojure/clojure/1.4.0/clojure-1.4.0.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/ordered/ordered/1.2.0/ordered-1.2.0.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/joda-time/joda-time/2.0/joda-time-2.0.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/org/clojure/core.unify/0.5.2/core.unify-0.5.2.jar"/>
+	<classpathentry kind="lib" path="/home/joseph/.m2/repository/swiss-arrows/swiss-arrows/0.1.0/swiss-arrows-0.1.0.jar"/>
+	<classpathentry kind="lib" path="lib/clojure-1.4.0.jar"/>
 	<classpathentry kind="src" path="test"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="lib" path="classes"/>
-	<classpathentry kind="lib" path="lib/clojure-1.4.0.jar"/>
-	<classpathentry kind="output" path="bin"/>
+	<classpathentry kind="output" path="target/classes"/>
 </classpath>
