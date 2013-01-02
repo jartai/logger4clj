@@ -44,6 +44,9 @@ I don't think github allows me to serve the pages as html here :(
 *  clojure/java.jdbc-based database logging appender
 *  ability to log current thread and namespace
 *  Message bundles for externalizing messages e.g. (log :error :invalid-parm-error parm)
+*  Allow binding with more than one appender per bound logger
+*  Allow suppression of loggers that are bound to bound loggers (:suppress tag 
+   under `bind-logger` clause?)
 *  It may be yet be possible, but very tricky, to only get the logging message 
    parameter to evaluate if the logging level is high enough to warrant it. 
    Currently this would require the courage to attempt writing a macro that produces a macro.
