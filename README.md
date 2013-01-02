@@ -12,6 +12,9 @@ Available in leiningen via clojars:
 Read the [Logger4clj Manual](https://github.com/jkauzlar/logger4clj/wiki/Logger4clj-Manual) 
 for an in-depth introduction.
 
+Additionally, API documentation is available under /doc, generated using Codox, however
+I don't think github allows me to serve the pages as html here :(
+
 ###Features 0.2
 
 *  File appender supports time- or size-based rollover
@@ -160,7 +163,7 @@ own appenders and start themselves before being bound a client.
 
 ##License
 
-Source Copyright © 2012 Joe Kauzlarich. 
+Source Copyright © 2013 Joe Kauzlarich. 
 Distributed under the Eclipse Public License, the same as Clojure uses. 
 See the file COPYING.
 
