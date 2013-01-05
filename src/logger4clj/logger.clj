@@ -93,7 +93,7 @@ allows some flexibility in function arguments as to which is provided."
   (if (and 
         (map? logger-or-data)
         (contains? logger-or-data :map-type)
-        (= (:map-type logger-or-data :logger4clj-logger)))
+        (= (:map-type logger-or-data) :logger4clj-logger))
     logger-or-data
     (let [internal (try 
                      (logger-or-data :-internal)
@@ -102,7 +102,8 @@ allows some flexibility in function arguments as to which is provided."
       (if (nil? internal)
         (throw (IllegalArgumentException. 
                  (format "Expected logger in argument but got a [%s]" 
-                         (class logger-or-data))))))))
+                         (class logger-or-data))))
+        internal))))
 
 (defn- comma-separated
   [list-of-strings]
