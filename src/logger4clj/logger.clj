@@ -229,7 +229,6 @@ against listener thresholds."
   (when-not (= (:category msg-parms) :-stop-logger)
     (doseq [appender-def (vals (deref (:appenders logger)))] 
       (when (check-log-lvl (second appender-def) (:log-lvl msg-parms))
-        (println "Message parameters: " msg-parms)
         ((:do-log (first appender-def)) msg-parms)))))
 
 (defn- init-logging-thread
